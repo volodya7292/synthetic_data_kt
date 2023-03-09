@@ -6,7 +6,7 @@ import com.sun.jna.Native.load
 import com.sun.jna.Pointer
 import com.sun.jna.Structure
 
-typealias SynthNetHandle = Long
+internal typealias SynthNetHandle = Long
 
 internal const val RAW_COLUMN_TYPE_CONTINUOUS = 0
 internal const val RAW_COLUMN_TYPE_DISCRETE = 1
@@ -37,7 +37,7 @@ internal interface CSynthLib : Library {
         train_params: TrainParams
     ): SynthNetHandle
 
-    fun synth_net_sample(handle: SynthNetHandle, columns: Array<Pointer>, n_samples: Int)
+    fun synth_net_sample(handle: SynthNetHandle, columns: Pointer, n_samples: Int)
 
     fun synth_net_destroy(handle: SynthNetHandle)
 }

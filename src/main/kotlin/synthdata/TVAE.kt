@@ -1,7 +1,8 @@
+@file:Suppress("unused")
+
 package synthdata
 
 import com.sun.jna.Memory
-import com.sun.jna.Pointer
 import java.io.Closeable
 
 enum class ColumnType(val nativeId: Int) {
@@ -38,23 +39,26 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
     Closeable {
 
     companion object {
+        @Suppress("UNCHECKED_CAST")
         fun fit(data: Array<ColumnData>, batchSize: Int, flowControl: (epoch: Int, loss: Double) -> DoStop): TVAE {
             val nRows = data[0].rowCount
             assert(data.all { it.rowCount == nRows })
 
             val columnTypes = data.map { it.type }
+            val rawData = CSynthLib.RawColumnData().toArray(columnTypes.size) as Array<CSynthLib.RawColumnData>
 
-            val rawData = data.map {
-                val mem = Memory(nRows.toLong() * it.type.elementSize)
-                when (it) {
-                    is ColumnData.Continuous -> mem.write(0, it.data, 0, it.data.size)
-                    is ColumnData.Discrete -> mem.write(0, it.data, 0, it.data.size)
+            for ((i, col) in data.withIndex()) {
+                val mem = Memory(nRows.toLong() * col.type.elementSize)
+                when (col) {
+                    is ColumnData.Continuous -> mem.write(0, col.data, 0, col.data.size)
+                    is ColumnData.Discrete -> mem.write(0, col.data, 0, col.data.size)
                 }
-                CSynthLib.RawColumnData(it.type.nativeId, mem)
+                rawData[i].type = col.type.nativeId
+                rawData[i].data = mem
             }
 
             val handle = CSynthLib.INSTANCE.synth_net_fit(
-                rawData.toTypedArray(),
+                rawData,
                 data.size,
                 nRows,
                 CSynthLib.TrainParams(batchSize, object : CSynthLib.FlowControlCallback {
@@ -64,37 +68,34 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
                 })
             )
 
-            for (col in rawData) {
-                (col.data as Memory).close()
+            for (rawCol in rawData) {
+                (rawCol.data as Memory).close()
             }
 
             return TVAE(handle, columnTypes.toTypedArray())
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun sample(sampleCount: Int): Array<ColumnData> {
         val columnCount = columnTypes.size
         val totalRowSize = columnTypes.sumOf { it.elementSize }
 
-
         val mem = Memory(sampleCount * totalRowSize.toLong())
+        CSynthLib.INSTANCE.synth_net_sample(handle, mem, sampleCount)
 
-        val rawDataColumns = mutableListOf<Pointer>()
-        var currRowOffset = 0
+        val sampledColumns = mutableListOf<ColumnData>()
+        var currColOffset = 0L
 
         for (i in 0 until columnCount) {
-            rawDataColumns.add(mem.share(currRowOffset * sampleCount.toLong()))
-            currRowOffset += columnTypes[i].elementSize
-        }
-
-        CSynthLib.INSTANCE.synth_net_sample(handle, rawDataColumns.toTypedArray(), sampleCount)
-
-        val sampledColumns = rawDataColumns.zip(columnTypes).map { (ptr, type) ->
-            when (type) {
-                ColumnType.Continuous -> ColumnData.Continuous(ptr.getFloatArray(0, sampleCount))
-                ColumnType.Discrete -> ColumnData.Discrete(ptr.getIntArray(0, sampleCount))
+            val data = when (columnTypes[i]) {
+                ColumnType.Continuous -> ColumnData.Continuous(mem.getFloatArray(currColOffset, sampleCount))
+                ColumnType.Discrete -> ColumnData.Discrete(mem.getIntArray(currColOffset, sampleCount))
             }
+            sampledColumns.add(data)
+            currColOffset += columnTypes[i].elementSize * sampleCount
         }
+
         return sampledColumns.toTypedArray()
     }
 

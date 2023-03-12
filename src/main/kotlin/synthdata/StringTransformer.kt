@@ -12,13 +12,13 @@ class StringTransformer(uniques: Array<String>) {
     private var strToIdx = mapOf<String, Int>()
 
     init {
-        this.uniques = uniques.distinct().toTypedArray()
+        this.uniques = uniques.map { it.trim() }.distinct().toTypedArray()
         strToIdx = this.uniques.withIndex().associate { Pair(it.value, it.index) }
     }
 
     /** Transforms strings to corresponding integers */
     fun transform(data: Array<String>): IntArray {
-        return data.map { strToIdx[it]!! }.toIntArray()
+        return data.map { strToIdx[it.trim()]!! }.toIntArray()
     }
 
     /** Transforms integers to corresponding strings */

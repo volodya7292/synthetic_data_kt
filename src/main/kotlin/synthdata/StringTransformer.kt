@@ -1,4 +1,4 @@
-@file:Suppress("unused")
+@file:Suppress("unused", "MemberVisibilityCanBePrivate")
 
 package synthdata
 
@@ -6,18 +6,14 @@ package synthdata
  * Creates/reverses mapping of list of strings to integers.
  * Each distinct string is associated with a unique index.
  */
-class StringTransformer(set: Array<String>) {
-    private var uniques = arrayOf<String>()
+class StringTransformer(uniques: Array<String>) {
+    /** Unique strings */
+    val uniques: Array<String>
     private var strToIdx = mapOf<String, Int>()
 
     init {
-        uniques = set.distinct().toTypedArray()
-        strToIdx = uniques.withIndex().associate { Pair(it.value, it.index) }
-    }
-
-    /** Returns the number of unique items in this transformer */
-    fun uniquesSize(): Int {
-        return uniques.size
+        this.uniques = uniques.distinct().toTypedArray()
+        strToIdx = this.uniques.withIndex().associate { Pair(it.value, it.index) }
     }
 
     /** Transforms strings to corresponding integers */

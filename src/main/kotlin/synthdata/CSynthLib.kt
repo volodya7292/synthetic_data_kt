@@ -30,6 +30,11 @@ internal interface CSynthLib : Library {
         fun invoke(epoch: Int, loss: Double): Boolean
     }
 
+    @Structure.FieldOrder("c_str")
+    open class SynthNetSnapshot(@JvmField var c_str: String = "") : Structure() {
+        class ByValue : SynthNetSnapshot(), Structure.ByValue
+    }
+
     fun synth_net_fit(
         columns: Array<RawColumnData>,
         n_columns: Int,
@@ -39,5 +44,11 @@ internal interface CSynthLib : Library {
 
     fun synth_net_sample(handle: SynthNetHandle, columns: Pointer, n_samples: Int)
 
+    fun synth_net_create_snapshot(handle: SynthNetHandle): SynthNetSnapshot.ByValue
+
+    fun synth_net_create_from_snapshot(snapshot: SynthNetSnapshot): SynthNetHandle
+
     fun synth_net_destroy(handle: SynthNetHandle)
+
+    fun synth_net_snapshot_destroy(snapshot: SynthNetSnapshot)
 }

@@ -3,8 +3,13 @@
 package synthdata
 
 import com.sun.jna.Memory
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.Closeable
 
+@Serializable
 enum class ColumnType(val nativeId: Int) {
     Continuous(RAW_COLUMN_TYPE_CONTINUOUS),
     Discrete(RAW_COLUMN_TYPE_DISCRETE);
@@ -39,6 +44,9 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
     Closeable {
 
     companion object {
+        private const val JSON_NET_INTERNALS = "netInternals"
+        private const val JSON_COLUMN_TYPES = "columnTypes"
+
         @Suppress("UNCHECKED_CAST")
         fun fit(data: Array<ColumnData>, batchSize: Int, flowControl: (epoch: Int, loss: Double) -> DoStop): TVAE {
             val nRows = data[0].rowCount
@@ -74,6 +82,15 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
 
             return TVAE(handle, columnTypes.toTypedArray())
         }
+
+        fun load(json: String): TVAE {
+            val data = Json.decodeFromString<TVAEData>(json)
+
+            val handle =
+                CSynthLib.INSTANCE.synth_net_create_from_snapshot(CSynthLib.SynthNetSnapshot(data.netInternals))
+
+            return TVAE(handle, data.columnTypes)
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -99,8 +116,19 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
         return sampledColumns.toTypedArray()
     }
 
+    fun save(): String {
+        val snapshot = CSynthLib.INSTANCE.synth_net_create_snapshot(handle)
+        val data = TVAEData(snapshot.c_str, columnTypes)
+
+        CSynthLib.INSTANCE.synth_net_snapshot_destroy(snapshot)
+
+        return Json.encodeToString(data)
+    }
+
     override fun close() {
         CSynthLib.INSTANCE.synth_net_destroy(handle)
     }
 }
 
+@Serializable
+private class TVAEData(val netInternals: String, val columnTypes: Array<ColumnType>)

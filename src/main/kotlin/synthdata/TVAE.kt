@@ -38,6 +38,17 @@ sealed class ColumnData {
         }
 }
 
+sealed class SampledColumnData(var realness: Float) {
+    open class Continuous(var data: FloatArray, realness: Float) : SampledColumnData(realness)
+    open class Discrete(var data: IntArray, realness: Float) : SampledColumnData(realness)
+
+    val rowCount
+        get() = when (this) {
+            is Continuous -> this.data.size
+            is Discrete -> this.data.size
+        }
+}
+
 typealias DoStop = Boolean
 
 class TVAE internal constructor(private val handle: SynthNetHandle, private val columnTypes: Array<ColumnType>) :
@@ -94,20 +105,30 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun sample(sampleCount: Int): Array<ColumnData> {
+    fun sample(sampleCount: Int): Array<SampledColumnData> {
         val columnCount = columnTypes.size
         val totalRowSize = columnTypes.sumOf { it.elementSize }
 
         val mem = Memory(sampleCount * totalRowSize.toLong())
-        CSynthLib.INSTANCE.synth_net_sample(handle, mem, sampleCount)
+        val realnessData = Memory(columnCount * Float.SIZE_BYTES.toLong())
 
-        val sampledColumns = mutableListOf<ColumnData>()
+        CSynthLib.INSTANCE.synth_net_sample(handle, mem, realnessData, sampleCount)
+
+        val sampledColumns = mutableListOf<SampledColumnData>()
         var currColOffset = 0L
 
         for (i in 0 until columnCount) {
+            val realness = realnessData.getFloat(i * Float.SIZE_BYTES.toLong())
             val data = when (columnTypes[i]) {
-                ColumnType.Continuous -> ColumnData.Continuous(mem.getFloatArray(currColOffset, sampleCount))
-                ColumnType.Discrete -> ColumnData.Discrete(mem.getIntArray(currColOffset, sampleCount))
+                ColumnType.Continuous -> SampledColumnData.Continuous(
+                    mem.getFloatArray(currColOffset, sampleCount),
+                    realness
+                )
+
+                ColumnType.Discrete -> SampledColumnData.Discrete(
+                    mem.getIntArray(currColOffset, sampleCount),
+                    realness
+                )
             }
             sampledColumns.add(data)
             currColOffset += columnTypes[i].elementSize * sampleCount

@@ -42,7 +42,13 @@ internal interface CSynthLib : Library {
         train_params: TrainParams
     ): SynthNetHandle
 
-    fun synth_net_sample(handle: SynthNetHandle, columns: Pointer, realness: Pointer, n_samples: Int)
+    fun synth_net_sample(
+        handle: SynthNetHandle,
+        columns: Pointer,
+        realness: Pointer,
+        correlation_realness: Pointer,
+        n_samples: Int
+    )
 
     fun synth_net_create_snapshot(handle: SynthNetHandle): SynthNetSnapshot.ByValue
 

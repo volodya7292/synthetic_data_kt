@@ -49,6 +49,8 @@ sealed class SampledColumnData(var realness: Float) {
         }
 }
 
+class SampleResult(val columns: Array<SampledColumnData>, val correlationRealness: Float)
+
 typealias DoStop = Boolean
 
 class TVAE internal constructor(private val handle: SynthNetHandle, private val columnTypes: Array<ColumnType>) :
@@ -105,14 +107,15 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun sample(sampleCount: Int): Array<SampledColumnData> {
+    fun sample(sampleCount: Int): SampleResult {
         val columnCount = columnTypes.size
         val totalRowSize = columnTypes.sumOf { it.elementSize }
 
         val mem = Memory(sampleCount * totalRowSize.toLong())
         val realnessData = Memory(columnCount * Float.SIZE_BYTES.toLong())
+        val correlationRealness = Memory(Float.SIZE_BYTES.toLong())
 
-        CSynthLib.INSTANCE.synth_net_sample(handle, mem, realnessData, sampleCount)
+        CSynthLib.INSTANCE.synth_net_sample(handle, mem, realnessData, correlationRealness, sampleCount)
 
         val sampledColumns = mutableListOf<SampledColumnData>()
         var currColOffset = 0L
@@ -134,7 +137,7 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
             currColOffset += columnTypes[i].elementSize * sampleCount
         }
 
-        return sampledColumns.toTypedArray()
+        return SampleResult(sampledColumns.toTypedArray(), correlationRealness.getFloat(0))
     }
 
     fun save(): String {

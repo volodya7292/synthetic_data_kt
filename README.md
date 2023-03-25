@@ -1,6 +1,6 @@
 # synthetic_data_kt
 
-JVM bindings to `synthetic_data` library.
+JVM bindings to [`synthetic_data`](https://github.com/volodya7292/synthetic_data) system library.
 
 ### Getting started
 

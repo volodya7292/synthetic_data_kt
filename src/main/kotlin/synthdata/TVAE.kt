@@ -63,7 +63,10 @@ class TVAE internal constructor(private val handle: SynthNetHandle, private val 
         @Suppress("UNCHECKED_CAST")
         fun fit(data: Array<ColumnData>, batchSize: Int, flowControl: (epoch: Int, loss: Double) -> DoStop): TVAE {
             val nRows = data[0].rowCount
-            assert(data.all { it.rowCount == nRows })
+            
+            if (data.any { it.rowCount != nRows }) {
+                throw IllegalArgumentException("All columns must have the same number of rows.")
+            }
 
             val columnTypes = data.map { it.type }
             val rawData = CSynthLib.RawColumnData().toArray(columnTypes.size) as Array<CSynthLib.RawColumnData>
